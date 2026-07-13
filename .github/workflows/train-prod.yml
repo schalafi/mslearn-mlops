@@ -32,25 +32,28 @@ jobs:
         run: |
           az extension add -n ml -y
 
-      - name: Detect Azure ML workspace
+      - name: Configure Azure ML workspace
         id: detect
         run: |
-          RG_NAME=$(az group list --query "[?starts_with(name,'rg-ai300-l')].name | [0]" -o tsv)
-          if [ -z "$RG_NAME" ]; then
-            echo "No resource group starting with rg-ai300-l found." >&2
-            exit 1
-          fi
+          echo "Azure account:"
+          az account show --query "{subscription:id, tenant:tenantId, user:user.name}" -o table
 
-          WS_NAME=$(az ml workspace list --resource-group "$RG_NAME" --query "[?starts_with(name,'mlw-ai300-l')].name | [0]" -o tsv)
-          if [ -z "$WS_NAME" ]; then
-            echo "No workspace starting with mlw-ai300-l found in $RG_NAME." >&2
-            exit 1
-          fi
+          echo "Using resource group: ${{ vars.AZURE_RESOURCE_GROUP }}"
+          echo "Using workspace: ${{ vars.AZURE_WORKSPACE_NAME }}"
 
-          az configure --defaults group="$RG_NAME" workspace="$WS_NAME"
+          az configure --defaults \
+            group="${{ vars.AZURE_RESOURCE_GROUP }}" \
+            workspace="${{ vars.AZURE_WORKSPACE_NAME }}"
 
-          echo "resource_group=$RG_NAME" >> "$GITHUB_OUTPUT"
-          echo "workspace=$WS_NAME" >> "$GITHUB_OUTPUT"
+          echo "Checking Azure ML workspace..."
+          az ml workspace show \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --name "${{ vars.AZURE_WORKSPACE_NAME }}" \
+            --query "{name:name, location:location, id:id}" \
+            -o table
+
+          echo "resource_group=${{ vars.AZURE_RESOURCE_GROUP }}" >> "$GITHUB_OUTPUT"
+          echo "workspace=${{ vars.AZURE_WORKSPACE_NAME }}" >> "$GITHUB_OUTPUT"
 
       - name: Run training job in prod
         id: train
